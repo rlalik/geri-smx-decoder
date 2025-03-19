@@ -8,12 +8,47 @@
 #include <string>
 #include <vector>
 
-#if (__cplusplus >= 202002L)
+#ifdef __cpp_lib_format
 #include <format>
 #endif
 
-#if (__cplusplus >= 202302L)
+#ifdef __cpp_lib_print
 #include <print>
+#endif
+
+#ifndef __cpp_lib_format
+#define BYTE_TO_BINARY_PATTERN "%c%c%c%c%c%c%c%c"
+#define BITS2_TO_BINARY_PATTERN "%c%c"
+#define BITS12_TO_BINARY_PATTERN "%c%c%c%c%c%c%c%c%c%c%c%c"
+// clang-format off
+#define BYTE_TO_BINARY(byte)  \
+((byte) & 0x80 ? '1' : '0'), \
+((byte) & 0x40 ? '1' : '0'), \
+((byte) & 0x20 ? '1' : '0'), \
+((byte) & 0x10 ? '1' : '0'), \
+((byte) & 0x08 ? '1' : '0'), \
+((byte) & 0x04 ? '1' : '0'), \
+((byte) & 0x02 ? '1' : '0'), \
+((byte) & 0x01 ? '1' : '0')
+
+#define BITS2_TO_BINARY(byte)  \
+((byte) & 0x2 ? '1' : '0'), \
+((byte) & 0x1 ? '1' : '0')
+
+#define BITS12_TO_BINARY(byte)  \
+((byte) & 0x800 ? '1' : '0'), \
+((byte) & 0x400 ? '1' : '0'), \
+((byte) & 0x200 ? '1' : '0'), \
+((byte) & 0x100 ? '1' : '0'), \
+((byte) & 0x080 ? '1' : '0'), \
+((byte) & 0x040 ? '1' : '0'), \
+((byte) & 0x020 ? '1' : '0'), \
+((byte) & 0x010 ? '1' : '0'), \
+((byte) & 0x008 ? '1' : '0'), \
+((byte) & 0x004 ? '1' : '0'), \
+((byte) & 0x002 ? '1' : '0'), \
+((byte) & 0x001 ? '1' : '0')
+// clang-format on
 #endif
 
 namespace geri
@@ -29,13 +64,17 @@ class ts_match_error : public std::exception
 public:
     ts_match_error(uint16_t event_ts, uint16_t hit_tsb) : ts_event{event_ts}, ts_hit{hit_tsb}
     {
-#if (__cplusplus >= 202002L)
+#ifdef __cpp_lib_format
         message = std::format("Event ts = {:#016b} , hit ts = {:#012b}:  bits<9:8> == {:#04b} vs {:#04b}", ts_event,
                               ts_hit, (ts_event >> 8) & 0x3, (ts_hit >> 8) & 0x3);
 #else
         char buf[200];
-        sprintf(buf, "Event ts = %#016b , hit ts = %#012b:  bits<9:8> == %#04b vs %#04b", ts_event, ts_hit,
-                (ts_event >> 8) & 0x3, (ts_hit >> 8) & 0x3);
+        sprintf(buf,
+                "Event ts = 0b " BYTE_TO_BINARY_PATTERN " " BYTE_TO_BINARY_PATTERN
+                " , hit ts = 0b" BITS12_TO_BINARY_PATTERN ":  bits<9:8> == 0b" BITS2_TO_BINARY_PATTERN
+                " vs 0b" BITS2_TO_BINARY_PATTERN,
+                BYTE_TO_BINARY(ts_event >> 8), BYTE_TO_BINARY(ts_event), BITS12_TO_BINARY(ts_hit),
+                BITS2_TO_BINARY((ts_event >> 8) & 0x3), BITS2_TO_BINARY((ts_hit >> 8) & 0x3));
         message = buf;
 #endif
     }
@@ -283,12 +322,12 @@ private:
     {
         if (word != expected)
         {
-#if (__cplusplus >= 202302L)
+#ifdef __cpp_lib_print
             std::print("Expected {:#018x} got {:#018x}\n", expected, word);
-#elif (__cplusplus >= 202002L)
+#elifdef __cpp_lib_format
             std::printf("%s", std::format("Expected {:#018x} got {:#018x}\n", expected, word).c_str());
 #else
-            std::printf("Expected %#018x got %#018x\n", expected, word);
+            std::printf("Expected %#018lx got %#018lx\n", expected, word);
 #endif
             return false;
         }
@@ -377,7 +416,7 @@ public:
             }
             else
             {
-                // std::print("Full word: {:018x}\n", word);
+                // std::print("Full word: {:#018x}\n", word);
 
                 uint32_t words[2] = {static_cast<uint32_t>(word & 0xffffffff), static_cast<uint32_t>(word >> 32)};
 
@@ -423,7 +462,11 @@ public:
 
                         default:
                         {
-                            // std::print("other word\n");
+#ifdef __cpp_lib_print
+                            std::print(stderr, "other word -- unsupporter yet\n");
+#else
+                            std::fprintf(stderr, "other word -- unsupporter yet\n");
+#endif
                         }
                         break;
                     }
@@ -450,7 +493,7 @@ public:
 
 } // namespace geri
 
-#if (__cplusplus >= 202002L)
+#ifdef __cpp_lib_format
 
 template <> struct std::formatter<geri::gbt::gbt_uplink_addr>
 {

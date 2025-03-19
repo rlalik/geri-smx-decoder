@@ -2,7 +2,7 @@
 
 #include <algorithm>
 #include <chrono>
-#include <print>
+#include <cstdio>
 #include <stdexcept>
 
 #include <getopt.h>

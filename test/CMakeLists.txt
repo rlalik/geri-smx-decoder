@@ -16,7 +16,6 @@ FetchContent_Declare(GTest
 )
 FetchContent_MakeAvailable(GTest)
 
-
 if(PROJECT_IS_TOP_LEVEL)
   find_package(geri-smx-decoder REQUIRED)
   enable_testing()

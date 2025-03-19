@@ -2,7 +2,11 @@
 
 #include <algorithm>
 #include <chrono>
+#ifdef __cpp_lib_print
 #include <print>
+#else
+#include <cstdio>
+#endif
 #include <stdexcept>
 
 #include <getopt.h>
@@ -12,7 +16,12 @@ namespace
 
 auto parse_file(const char* filename, int verbose) -> void
 {
+#ifdef __cpp_lib_print
     std::print("Reading file: {:s}\n", filename);
+#else
+    std::printf("Reading file: %s\n", filename);
+#endif
+
     geri::file_reader frdr(filename);
 
     auto decoder = geri::payload_decoder(&frdr);
@@ -25,15 +34,39 @@ auto parse_file(const char* filename, int verbose) -> void
         try
         {
             auto res = decoder.decode_frame();
-            if (verbose > 0) { std::print("  Event: {:d}  payload size: {:d} hits\n", res.event_no, res.hits.size()); }
+            if (verbose > 0)
+            {
+#ifdef __cpp_lib_print
+                std::print("  Event: {:d}  payload size: {:d} hits\n", res.event_no, res.hits.size());
+            }
+#else
+                std::printf("  Event: %d  payload size: %ld hits\n", res.event_no, res.hits.size());
+            }
+#endif
             if (verbose > 1)
             {
                 for (const auto& hit : res.hits)
                 {
-                    std::print("  Hit  {}\n", hit);
+#ifdef __cpp_lib_print
+                    std::print("  Event: {:d}  payload size: {:d} hits\n", res.event_no, res.hits.size());
+#else
+                    std::printf("  Event: %u  payload size: %ld hits\n", res.event_no, res.hits.size());
+#endif
                 }
+                if (verbose > 1)
+                {
+                    for (const auto& hit : res.hits)
+                    {
+#ifdef __cpp_lib_print
+                        std::print("  Hit  {}\n", hit);
+#else
+                        std::printf("  Hit  GBT: %u  Uplink: %2d  channel: %3d  adc: %3u  full ts: %016x  em: %d\n",
+                                    hit.gbt, hit.uplink, hit.channel, hit.adc, hit.full_ts, hit.event_missing);
+#endif
+                    }
+                }
+                n_evts++;
             }
-            n_evts++;
         }
         catch (const std::out_of_range&)
         {
@@ -45,8 +78,13 @@ auto parse_file(const char* filename, int verbose) -> void
     auto duration = std::chrono::duration_cast<std::chrono::milliseconds>(end - begin);
 
     const auto s_to_ms_conv{1000.0};
+#ifdef __cpp_lib_print
     std::print("Read {} events in {} s -- {:.4f} evts/s\n", n_evts, duration.count() / s_to_ms_conv,
                n_evts * s_to_ms_conv / duration.count());
+#else
+    std::printf("Read %d events in %f s -- %.4f evts/s\n", n_evts, duration.count() / s_to_ms_conv,
+                n_evts * s_to_ms_conv / duration.count());
+#endif
 }
 
 } // namespace

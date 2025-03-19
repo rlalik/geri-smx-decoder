@@ -1,0 +1,39 @@
+name: Host Systems Check
+
+on:
+  push:
+    branches:
+    - master
+
+  pull_request:
+    branches:
+    - master
+
+jobs:
+  system-tests:
+
+    strategy:
+      matrix:
+        container: ["ubuntu:jammy", "ubuntu:noble", "ubuntu:oracular", "debian:bookworm", "debian:trixie"]
+
+    runs-on: ubuntu:latest
+
+    container:
+      image: ${{ matrix.container }}
+
+    steps:
+    - uses: actions/checkout@v4
+
+    - name: Install tools
+      run: apt-get update -q
+        && apt-get install cmake make g++ git -q -y
+
+    - name: Configure
+      run: cmake -S . -B build -DBUILD_EXAMPLES=ON -Dgeri-smx-decoder_DEVELOPER_MODE=ON -DBUILD_TESTING=ON
+
+    - name: Build
+      run: cmake --build build -j 2
+
+    - name: Test
+      working-directory: build
+      run: ctest --output-on-failure --no-tests=error -C Release -j 2
