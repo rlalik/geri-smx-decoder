@@ -48,25 +48,14 @@ auto parse_file(const char* filename, int verbose) -> void
                 for (const auto& hit : res.hits)
                 {
 #ifdef __cpp_lib_print
-                    std::print("  Event: {:d}  payload size: {:d} hits\n", res.event_no, res.hits.size());
+                    std::print("  Hit  {}\n", hit);
 #else
-                    std::printf("  Event: %u  payload size: %ld hits\n", res.event_no, res.hits.size());
+                    std::printf("  Hit  GBT: %u  Uplink: %2d  channel: %3d  adc: %3u  full ts: %016x  em: %d\n",
+                                hit.gbt, hit.uplink, hit.channel, hit.adc, hit.full_ts, hit.event_missing);
 #endif
                 }
-                if (verbose > 1)
-                {
-                    for (const auto& hit : res.hits)
-                    {
-#ifdef __cpp_lib_print
-                        std::print("  Hit  {}\n", hit);
-#else
-                        std::printf("  Hit  GBT: %u  Uplink: %2d  channel: %3d  adc: %3u  full ts: %016x  em: %d\n",
-                                    hit.gbt, hit.uplink, hit.channel, hit.adc, hit.full_ts, hit.event_missing);
-#endif
-                    }
-                }
-                n_evts++;
             }
+            n_evts++;
         }
         catch (const std::out_of_range&)
         {
