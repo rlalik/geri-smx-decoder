@@ -1,3 +1,7 @@
+/* Copyright (C) 2025-2026 Jagiellonian University, Kraków, Poland
+   SPDX-License-Identifier: LGPL-3.0-or-later
+   Authors: Rafał Lalik [committer] */
+
 #include "geri-smx-decoder/geri-smx-decoder.hpp"
 
 #include <algorithm>

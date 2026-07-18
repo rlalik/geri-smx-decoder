@@ -1,3 +1,7 @@
+/* Copyright (C) 2025-2026 Jagiellonian University, Kraków, Poland
+   SPDX-License-Identifier: LGPL-3.0-or-later
+   Authors: Rafał Lalik [committer] */
+
 #include "geri-smx-decoder/geri-smx-decoder.hpp"
 
 #include <algorithm>
@@ -15,7 +19,7 @@ auto parse_file(const char* filename, int verbose) -> void
     std::printf("Reading file: %s\n", filename);
     geri::file_reader frdr(filename);
 
-    auto decoder = geri::payload_decoder(&frdr);
+    auto decoder = geri::payload_decoder<geri::file_reader>(&frdr);
 
     int n_evts = 0;
 

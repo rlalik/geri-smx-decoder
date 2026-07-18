@@ -1,0 +1,36 @@
+name: C++20
+
+on:
+  push:
+  pull_request:
+  release:
+
+jobs:
+  standard-check:
+    name: C++20
+    runs-on: ubuntu-26.04
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v6
+        with:
+          submodules: recursive
+
+      - name: Install compiler
+        id: setup_cc
+        uses: rlalik/setup-cpp-compiler@master
+        with:
+          compiler: gcc-16
+
+      - name: Configure
+        env:
+          CC: ${{ steps.setup_cc.outputs.cc }}
+          CXX: ${{ steps.setup_cc.outputs.cxx }}
+        run: cmake -S . -B build -Dgeri-smx-decoder_DEVELOPER_MODE=ON -DBUILD_TESTING=ON -DCMAKE_CXX_STANDARD=20
+
+      - name: Build
+        run: cmake --build build -j$(nproc)
+
+      - name: Test
+        working-directory: build
+        run: ctest --output-on-failure --no-tests=error -j 2

@@ -1,3 +1,22 @@
+/* Copyright (C) 2025-2026 Jagiellonian University, Kraków, Poland
+   SPDX-License-Identifier: LGPL-3.0-or-later
+   Authors: Rafał Lalik [committer] */
+
+/**
+ * @file geri-smx-decoder.hpp
+ * @brief API for GERI SMX Decoder
+ *
+ * This file describes the design and API of geri smx reader.
+ */
+
+/**
+ * @page page_example Examples
+ * @section sec_example_cpp_23 Simple File Read Example (C++23)
+ * @include file_read_example.cpp
+ * @section sec_example_cpp_11 Simple File Read Example (C++11)
+ * @include file_read_example_cpp11.cpp
+ */
+
 #pragma once
 
 #include <cstdint>
@@ -17,6 +36,10 @@
 #endif
 
 #ifndef __cpp_lib_format
+/**
+ * These helper macros are used in pre-c++23 standards to print binary numbers
+ * In c++23 std::format handles binary numbers better.
+ */
 #define BYTE_TO_BINARY_PATTERN "%c%c%c%c%c%c%c%c"
 #define BITS2_TO_BINARY_PATTERN "%c%c"
 #define BITS12_TO_BINARY_PATTERN "%c%c%c%c%c%c%c%c%c%c%c%c"
@@ -57,47 +80,66 @@ namespace geri
 namespace exceptions
 {
 /**
+ * Exception object thrown when the timestamp matching fails.
+ *
  * Thrown when the ts_msb<9:8> and hit.ts<9:8> bits don't match.
  */
 class ts_match_error : public std::exception
 {
 public:
-    ts_match_error(uint16_t event_ts, uint16_t hit_tsb) : ts_event{event_ts}, ts_hit{hit_tsb}
-    {
+    /**
+     * @param event_ts event timestamp
+     * @param hit_ts hit timestamp
+     */
+    ts_match_error(uint16_t event_ts, uint16_t hit_ts)
 #ifdef __cpp_lib_format
-        message = std::format("Event ts = {:#016b} , hit ts = {:#012b}:  bits<9:8> == {:#04b} vs {:#04b}", ts_event,
-                              ts_hit, (ts_event >> 8) & 0x3, (ts_hit >> 8) & 0x3);
+        : m_ts_event{event_ts}, m_ts_hit{hit_ts},
+          m_message{std::format("Event ts = {:#016b} , hit ts = {:#012b}:  bits<9:8> == {:#04b} vs {:#04b}", m_ts_event,
+                                m_ts_hit, (m_ts_event >> 8) & 0x3, (m_ts_hit >> 8) & 0x3)}
+    {
 #else
+        : m_ts_event{event_ts}, m_ts_hit{hit_ts}
+    {
         char buf[200];
         sprintf(buf,
                 "Event ts = 0b " BYTE_TO_BINARY_PATTERN " " BYTE_TO_BINARY_PATTERN
                 " , hit ts = 0b" BITS12_TO_BINARY_PATTERN ":  bits<9:8> == 0b" BITS2_TO_BINARY_PATTERN
                 " vs 0b" BITS2_TO_BINARY_PATTERN,
-                BYTE_TO_BINARY(ts_event >> 8), BYTE_TO_BINARY(ts_event), BITS12_TO_BINARY(ts_hit),
-                BITS2_TO_BINARY((ts_event >> 8) & 0x3), BITS2_TO_BINARY((ts_hit >> 8) & 0x3));
-        message = buf;
+                BYTE_TO_BINARY(m_ts_event >> 8), BYTE_TO_BINARY(m_ts_event), BITS12_TO_BINARY(m_ts_hit),
+                BITS2_TO_BINARY((m_ts_event >> 8) & 0x3), BITS2_TO_BINARY((m_ts_hit >> 8) & 0x3));
+        m_message = buf;
 #endif
     }
 
-    auto what() const noexcept -> const char* override { return message.c_str(); }
+    /// @inheritdoc
+    auto what() const noexcept -> const char* override { return m_message.c_str(); }
 
 private:
-    uint16_t ts_event, ts_hit;
-    std::string message;
+    uint16_t m_ts_event;   ///< event timestamp
+    uint16_t m_ts_hit;     ///< hit timestamp
+    std::string m_message; ///< exception message
 };
 
 /**
+ * Exception object thrown when bits mismatch is detected.
+ *
  * Throws when the TS_MSB frame is incorrect.
  */
 class ts_msb_error : public std::exception
 {
 public:
-    explicit ts_msb_error(uint32_t _ts_msb) : ts_msb{_ts_msb} {}
+    /**
+     * @param ts_msb TS_MSB word
+     */
+    explicit ts_msb_error(uint32_t ts_msb) : m_ts_msb{ts_msb} {}
 
 private:
-    uint32_t ts_msb;
+    uint32_t m_ts_msb; ///< timestamp MSB frame
 };
 
+/**
+ * Exception object thrown when invalid GBT frame is detected.
+ */
 class invalid_gbt_frame : public std::exception
 {
 };
@@ -148,26 +190,29 @@ constexpr auto get_uplink_frame_type(uint32_t word) -> UPLINK_FRAME_TYPE
     return UPLINK_FRAME_TYPE::hit;
 }
 
-/** store single hit data.
+/**
+ * Store single hit data.
  */
 struct hit
 {
-    uint8_t channel{0};
-    uint8_t adc{0};
-    uint16_t ts{0};
-    uint16_t full_ts{0};
-    bool event_missing{false};
+    uint8_t channel{0};        ///< channel number
+    uint8_t adc{0};            ///< adc value
+    uint16_t ts{0};            ///< timestamp
+    uint16_t full_ts{0};       ///< full ts build of event + hit timestamps
+    bool event_missing{false}; ///< flag whether previous event was missing
 };
 
 /**
- * Decode HIT uplink frame. Bits configuration (3 8-bit words, MSB first):
- *   ```0ccccccc aaaaattt ttttttte```
- * where: e - event missing bit
- *        t - 10-bit timestamp bits <9:0>
- *        a - 5-bit adc value, always > 0
- *        c - 7-bit address channel
+ * Decode HIT uplink frame.
  *
- * @param word 24-bit board
+ * Bits configuration (3 8-bit words, MSB first): `0ccccccc aaaaattt ttttttte`, where:
+ * - e - event missing bit
+ * - t - 10-bit timestamp bits <9:0>
+ * - a - 5-bit adc value, always > 0
+ * - c - 7-bit address channel
+ *
+ * @param word 24-bit data word
+ * @param event_ts event timestamp, will be add to hit timestamp to create full timestamp
  * @return the hit structure
  */
 inline auto decode_smx_hit(uint32_t word, uint16_t event_ts) -> hit
@@ -195,12 +240,13 @@ inline auto decode_smx_hit(uint32_t word, uint16_t event_ts) -> hit
 }
 
 /**
- * Decode TS_MSB uplink frame. Bits configuration (3 8-bit words, MSB first):
- *   ```11xxxxxx yyyyyyzz zzzzcccc```
- * where: x,y,z - same value of ts_msb
- *        c - 4-bits CRC
+ * Decode TS_MSB uplink frame.
  *
- * @param word 24-bit board
+ * Bits configuration (3 8-bit words, MSB first): `11xxxxxx yyyyyyzz zzzzcccc`, where:
+ * - x,y,z - same value of ts_msb
+ * - c - 4-bits CRC
+ *
+ * @param word 24-bit data word
  * @return the hit structure
  */
 constexpr auto decode_smx_ts_msb(uint32_t word) -> uint16_t
@@ -232,15 +278,20 @@ constexpr auto decode_smx_ts_msb(uint32_t word) -> uint16_t
 namespace gbt
 {
 
+/**
+ * GBT uplink address data.
+ */
 struct gbt_uplink_addr
 {
-    uint8_t gbt{0x0};
-    uint8_t uplink{0x0};
-    uint8_t unique_addr{0x0};
+    uint8_t gbt{0x0};         ///< gbt number
+    uint8_t uplink{0x0};      ///< uplink number
+    uint8_t unique_addr{0x0}; ///< unique address
 };
 
 /**
  * Get Gbt address (uplink + GBT) from the word.
+ *
+ * @param word 24-bit data word
  */
 constexpr auto get_gbt_uplink_addr(uint32_t word)
 {
@@ -257,10 +308,24 @@ constexpr auto get_gbt_uplink_addr(uint32_t word)
 
 } // namespace gbt
 
+/**
+ * GBT hit data.
+ *
+ * It is a basic data structure corresponding to hit read out by a single channel of the SMX.
+ */
 struct gbt_hit : gbt::gbt_uplink_addr, smx::hit
 {
+    /**
+     * @param addr uplink address
+     */
     explicit gbt_hit(const gbt::gbt_uplink_addr& addr) : gbt::gbt_uplink_addr{addr} {}
 
+    /**
+     * Compare hits, they need to match with all components.
+     *
+     * @param rhs the other hit to compare
+     * @return test result
+     */
     auto operator=(const smx::hit& rhs) -> gbt_hit&
     {
         channel = rhs.channel;
@@ -273,30 +338,48 @@ struct gbt_hit : gbt::gbt_uplink_addr, smx::hit
     }
 };
 
+/**
+ * Payload data, which is a collection of gbt_hit with system timestamp and event number info.
+ */
 struct payload_frame
 {
-    uint32_t event_no{0};
-    uint64_t system_ts{0};
-    bool data_dropped{false};
+    uint32_t event_no{0};      ///< event number
+    uint64_t system_ts{0};     ///< system timestamp
+    bool data_dropped{false};  ///< flag if data was dropped in the preceding payload
 
-    std::vector<gbt_hit> hits;
+    std::vector<gbt_hit> hits; ///< hits in the event
 
     payload_frame() { hits.reserve(1024L * 1024L); }
 };
 
 inline void close_file(std::FILE* fp) { std::fclose(fp); }
 
+/**
+ * Handles file from which the data will be read from.
+ *
+ * It owns the file pointer. Exposes `read_word()` function which returns the next data word.
+ */
 class file_reader
 {
 private:
-    std::unique_ptr<FILE, decltype(&close_file)> fp;
+    std::unique_ptr<FILE, decltype(&close_file)> fp; ///< file pointer
 
 public:
+    /**
+     * @param filename file to read from
+     */
     explicit file_reader(const char* filename) : fp{fopen(filename, "rxe"), &close_file}
     {
         if (fp == nullptr) { abort(); }
     }
 
+    /**
+     * Red the next data word from the file.
+     *
+     * EOF is marked by `std::out_of_range` exception.
+     *
+     * @return 8-bit word
+     */
     auto read_word() -> uint64_t
     {
         uint64_t data{0x0};
@@ -308,16 +391,41 @@ public:
     }
 };
 
+/**
+ * Decodes the paylod data.
+ *
+ * This class does most of the work. To use it, create the file reader, initialize the payload decode and read frames:
+ * ```c++
+ * geri::file_reader frdr(filename);
+ * auto decoder = geri::payload_decoder(&frdr);
+ * auto n_evts = 0l;
+ * while (true) {
+ *   try {
+ *     auto res = decoder.decode_frame();
+ *     // do something with the data:
+ *     // res.event_no, res.hits
+ *     n_evts++;
+ *   } catch (const std::out_of_range&) { break; }// end of file
+ * }
+ * ```
+ */
 template <typename T> class payload_decoder
 {
 private:
-    T* data_reader{nullptr};
+    T* data_reader{nullptr};                        ///< pointer to the reader
 
-    static const uint64_t start_marker{0x579acce7};
-    static const uint64_t stop_marker{0xed9acce7};
+    static const uint64_t start_marker{0x579acce7}; ///< pattern which indicates begin of the frame
+    static const uint64_t stop_marker{0xed9acce7};  ///< pattern which indicates end of the frame
 
-    uint64_t last_systime = 0;
+    uint64_t last_systime = 0;                      ///< track the system time and its change
 
+    /**
+     * Helper function to check if data matches expected value and print info if not.
+     *
+     * @param word to be tested
+     * @param expected value
+     * @return test result
+     */
     auto expect_word(uint64_t word, uint64_t expected) -> bool
     {
         if (word != expected)
@@ -336,29 +444,40 @@ private:
     }
 
 public:
+    /**
+     * @param reader the reader object
+     */
     explicit payload_decoder(T* reader) : data_reader(reader) {}
 
     /**
      * Decode the dataframe.
      *
-     * Dataframe starts with four 64-bit words:
-     * 1. 0xEEEEEEEEMMMMMMMM - E - event number,  M - start marker
-     * 2. 0xSSSSSSSSSSSSSSSS - s - system time
-     * 3. 0x0000000000000000
-     * 4. 0x000000000000000D - data dropped persist bit
+     * Data frame starts with four 64-bit words:
+     * 1. `0xEEEEEEEEMMMMMMMM` - `E` - event number,  `M` - start marker
+     * 2. `0xSSSSSSSSSSSSSSSS` - `S` - system time
+     * 3. `0x0000000000000000`
+     * 4. `0x000000000000000D` - data dropped persist bit
      *
      * and ends up with another four 64-bit words:
-     * 1. 0xEEEEEEEEMMMMMMMM - E - event number,  M - stop marker
-     * 2. 0xSSSSSSSSSSSSSSSS - s - system time
-     * 3. 0x0000000000000000
-     * 4. 0x0000000000000000
+     * 1. `0xEEEEEEEEMMMMMMMM` - `E` - event number,  `M` - stop marker
+     * 2. `0xSSSSSSSSSSSSSSSS` - `S` - system time
+     * 3. `0x0000000000000000`
+     * 4. `0x0000000000000000`
      *
-     * In between there are data words. Each 64-bit data word contains 2 32-bit words.
-     * 32-bit format: 0xAASSSSSS - A gbt/uplink 8-bit address, S - SMX 24-bit words
-     * and address: 0bggguuuuu - g 3-bit GBT address, u - 5-bit uplink address
+     * In between there are data words. Each 64-bit data word contains two 32-bit words.
+     *
+     * 32-bit format: `0xAASSSSSS`:
+     * - `A` - gbt/uplink 8-bit address,
+     * - `S` - SMX 24-bit words
+     *
+     * and the address: `0bggguuuuu`:
+     * - `g` - 3-bit GBT address,
+     * - `u` - 5-bit uplink address
      *
      * The 32-bit data words within 64-bit data words are sorted, first read the 32 LS32B,
      * then MS32B.
+     *
+     * @return paylod data in payload_frame object
      */
     auto decode_frame() -> payload_frame
     {
@@ -412,7 +531,10 @@ public:
                 {
                     // std::print("Decoded wrong event number at frame end: {:#018x}\n", word);
                 }
-                else { break; }
+                else
+                {
+                    break;
+                }
             }
             else
             {
@@ -500,9 +622,7 @@ template <> struct std::formatter<geri::gbt::gbt_uplink_addr>
     static constexpr auto parse(std::format_parse_context& ctx) { return ctx.begin(); }
 
     static auto format(const geri::gbt::gbt_uplink_addr& obj, std::format_context& ctx)
-    {
-        return std::format_to(ctx.out(), "GBT: {:d}  Uplink: {:2d}", obj.gbt, obj.uplink);
-    }
+    { return std::format_to(ctx.out(), "GBT: {:d}  Uplink: {:2d}", obj.gbt, obj.uplink); }
 };
 
 template <> struct std::formatter<geri::smx::hit>

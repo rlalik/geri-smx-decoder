@@ -5,9 +5,9 @@ include(cmake/prelude.cmake)
 project(
     geri-smx-decoder
     VERSION 0.1.0
-    DESCRIPTION "Short description"
-    HOMEPAGE_URL "https://example.com/"
-    LANGUAGES NONE
+    DESCRIPTION "Single-header library to decode SMX data frames embedded into GBT protocol of GERI system."
+    HOMEPAGE_URL "https://github.com/rlalik/geri-smx-decoder"
+    LANGUAGES CXX
 )
 
 include(cmake/project-is-top-level.cmake)

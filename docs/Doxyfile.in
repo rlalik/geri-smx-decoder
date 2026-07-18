@@ -7,7 +7,18 @@ PROJECT_NAME = "@PROJECT_NAME@"
 PROJECT_NUMBER = "@PROJECT_VERSION@"
 
 # Add sources
-INPUT = "@PROJECT_SOURCE_DIR@/README.md" "@PROJECT_SOURCE_DIR@/include" "@PROJECT_SOURCE_DIR@/docs/pages"
+INPUT = "@PROJECT_SOURCE_DIR@/README.md" \
+        "@PROJECT_SOURCE_DIR@/BUILDING.md" \
+        "@PROJECT_SOURCE_DIR@/CONTRIBUTING.md" \
+        "@PROJECT_SOURCE_DIR@/CODE_OF_CONDUCT.md" \
+        "@PROJECT_SOURCE_DIR@/HACKING.md" \
+        "@PROJECT_SOURCE_DIR@/include" \
+        "@PROJECT_SOURCE_DIR@/docs/pages"
+
+EXAMPLE_PATH     = "@PROJECT_SOURCE_DIR@/example/"
+
+SHOW_FILES = YES
+DIRECTORY_GRAPH = NO
 EXTRACT_ALL = YES
 RECURSIVE = YES
 OUTPUT_DIRECTORY = "@DOXYGEN_OUTPUT_DIRECTORY@"
@@ -23,9 +34,29 @@ STRIP_FROM_INC_PATH =
 # We use m.css to generate the html documentation, so we only need XML output
 GENERATE_XML = YES
 GENERATE_HTML = NO
-GENERATE_LATEX = NO
+GENERATE_LATEX = YES
 XML_PROGRAMLISTING = NO
 CREATE_SUBDIRS = NO
+
+COMPACT_LATEX = YES
+LATEX_CMD_NAME = xelatex
+LATEX_HEADER = "@PROJECT_SOURCE_DIR@/docs/header.tex"
+LATEX_FOOTER = "@PROJECT_SOURCE_DIR@/docs/footer.tex"
+
+# Be verbose about missing documentation
+EXTRACT_STATIC         = YES
+EXTRACT_PRIVATE        = YES
+EXTRACT_LOCAL_CLASSES  = YES
+WARNINGS               = YES
+WARN_IF_UNDOCUMENTED   = YES
+WARN_IF_DOC_ERROR      = YES
+WARN_IF_INCOMPLETE_DOC = YES
+WARN_NO_PARAMDOC       = YES
+WARN_IF_UNDOC_ENUM_VAL = YES
+WARN_AS_ERROR          = NO
+WARN_LOGFILE           = doxygen.log
+
+EXCLUDE_SYMBOLS = *::operator*
 
 # Include all directories, files and namespaces in the documentation
 # Disable to include only explicitly documented objects
